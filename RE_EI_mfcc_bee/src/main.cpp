@@ -190,8 +190,17 @@ typedef struct {
 // ---------------------------------------------- NUMPY STRUCTS/CONSTANTS START ----------------------------------------------
 // ---------------------------------------------- NUMPY STRUCTS/CONSTANTS START ----------------------------------------------
 #define ei_dsp_register_alloc(...) (void)0
+#define M_PI 3.14159265358979323846264338327950288
 
-#define FLT_MAX		__FLT_MAX__
+typedef enum {
+    DCT_NORMALIZATION_NONE,
+    DCT_NORMALIZATION_ORTHO
+} DCT_NORMALIZATION_MODE;
+
+typedef struct {
+    float r;
+    float i;
+} fft_complex_t;
 
    /**
    * @brief 32-bit floating-point type definition.
@@ -2058,6 +2067,14 @@ public:
         return 0;
     }
 
+    static float sum(float *input_array, size_t input_array_size) {
+        float res = 0.0f;
+        for (size_t ix = 0; ix < input_array_size; ix++) {
+            res += input_array[ix];
+        }
+        return res;
+    }
+
     /**
      * Scale a matrix in place
      * @param matrix
@@ -2107,6 +2124,118 @@ public:
     }
 
     /**
+     * > 50% faster then the math.h log() function
+     * in return for a small loss in accuracy (0.00001 average diff with log())
+     * From: https://stackoverflow.com/questions/39821367/very-fast-approximate-logarithm-natural-log-function-in-c/39822314#39822314
+     * Licensed under the CC BY-SA 3.0
+     * @param a Input number
+     * @returns Natural log value of a
+     */
+    __attribute__((always_inline)) static inline float log(float a)
+    {
+        float m, r, s, t, i, f;
+        int32_t e, g;
+
+        g = (int32_t) * ((int32_t *)&a);
+        e = (g - 0x3f2aaaab) & 0xff800000;
+        g = g - e;
+        m = (float) * ((float *)&g);
+        i = (float)e * 1.19209290e-7f; // 0x1.0p-23
+        /* m in [2/3, 4/3] */
+        f = m - 1.0f;
+        s = f * f;
+        /* Compute log1p(f) for f in [-1/3, 1/3] */
+        r = fmaf(0.230836749f, f, -0.279208571f); // 0x1.d8c0f0p-3, -0x1.1de8dap-2
+        t = fmaf(0.331826031f, f, -0.498910338f); // 0x1.53ca34p-2, -0x1.fee25ap-2
+        r = fmaf(r, s, t);
+        r = fmaf(r, s, f);
+        r = fmaf(i, 0.693147182f, r); // 0x1.62e430p-1 // log(2)
+
+        return r;
+    }
+
+    /**
+     * Calculate the natural log value of a matrix. Does an in-place replacement.
+     * @param matrix Matrix (MxN)
+     * @returns 0 if OK
+     */
+    static int log(matrix_t *matrix)
+    {
+        for (uint32_t ix = 0; ix < matrix->rows * matrix->cols; ix++) {
+            matrix->buffer[ix] = numpy::log(matrix->buffer[ix]);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get the maximum value in a matrix per row
+     * @param input_matrix Input matrix (MxN)
+     * @param output_matrix Output matrix (Mx1)
+     */
+    static int max(matrix_t *input_matrix, matrix_t *output_matrix) {
+        if (input_matrix->rows != output_matrix->rows) {
+            return -1;
+        }
+        if (output_matrix->cols != 1) {
+            return -1;
+        }
+
+        for (size_t row = 0; row < input_matrix->rows; row++) {
+            float max = -FLT_MAX;
+
+            for (size_t col = 0; col < input_matrix->cols; col++) {
+                float v = input_matrix->buffer[( row * input_matrix->cols ) + col];
+                if (v > max) {
+                    max = v;
+                }
+            }
+
+            output_matrix->buffer[row] = max;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Multiply two matrices lazily per row in matrix 1 (MxN * NxK matrix)
+     * @param i matrix1 row index
+     * @param row matrix1 row
+     * @param matrix1_cols matrix1 row size (1xN)
+     * @param matrix2 Pointer to matrix2 (NxK)
+     * @param out_matrix Pointer to out matrix (MxK)
+     * @returns EIDSP_OK if OK
+     */
+    static inline int dot_by_row(int i, float *row, uint32_t matrix1_cols, matrix_t *matrix2, matrix_t *out_matrix) {
+        if (matrix1_cols != matrix2->rows) {
+            return -1;
+        }
+
+        for (size_t j = 0; j < matrix2->cols; j++) {
+            float tmp = 0.0f;
+            for (size_t k = 0; k < matrix1_cols; k++) {
+                tmp += row[k] * matrix2->buffer[k * matrix2->cols + j];
+            }
+            out_matrix->buffer[i * matrix2->cols + j] += tmp;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Subtract from matrix in place
+     * @param matrix
+     * @param subtraction
+     * @returns 0 if OK
+     */
+    static int subtract(matrix_t *matrix, float subtraction) {
+        for (uint32_t ix = 0; ix < matrix->rows * matrix->cols; ix++) {
+            matrix->buffer[ix] -= subtraction;
+        }
+        return 0;
+    }
+
+    /**
      * Normalize a matrix to 0..1. Does an in-place replacement.
      * Normalization done per row.
      * @param matrix
@@ -2120,20 +2249,20 @@ public:
 
         matrix_t min_matrix(1, 1);
         if (!min_matrix.buffer) {
-            EIDSP_ERR(EIDSP_OUT_OF_MEM);
+            return -1;
         }
         r = min(&temp_matrix, &min_matrix);
-        if (r != EIDSP_OK) {
-            EIDSP_ERR(r);
+        if (r != 0) {
+            return -1;
         }
 
         matrix_t max_matrix(1, 1);
         if (!max_matrix.buffer) {
-            EIDSP_ERR(EIDSP_OUT_OF_MEM);
+            return -1;
         }
         r = max(&temp_matrix, &max_matrix);
-        if (r != EIDSP_OK) {
-            EIDSP_ERR(r);
+        if (r != 0) {
+            return -1;
         }
 
         float min_max_diff = (max_matrix.buffer[0] - min_matrix.buffer[0]);
@@ -2141,16 +2270,16 @@ public:
         float row_scale = min_max_diff < 0.001 ? 1.0f : 1.0f / min_max_diff;
 
         r = subtract(&temp_matrix, min_matrix.buffer[0]);
-        if (r != EIDSP_OK) {
-            EIDSP_ERR(r);
+        if (r != 0) {
+            return -1;
         }
 
         r = scale(&temp_matrix, row_scale);
-        if (r != EIDSP_OK) {
-            EIDSP_ERR(r);
+        if (r != 0) {
+            return -1;
         }
 
-        return EIDSP_OK;
+        return 0;
     }
 
     /**
@@ -2297,6 +2426,183 @@ public:
         return 0;
     }
 
+    static int transform(float vector[], size_t len) {
+    const size_t fft_data_out_size = (len / 2 + 1) * sizeof(fft_complex_t);
+    const size_t fft_data_in_size = len * sizeof(float);
+
+    // Allocate KissFFT input / output buffer
+    fft_complex_t *fft_data_out =
+        (fft_complex_t*)calloc(fft_data_out_size, 1);
+    if (!fft_data_out) {
+        return -1;
+    }
+
+    float *fft_data_in = (float*)calloc(fft_data_in_size, 1);
+    if (!fft_data_in) {
+        free(fft_data_out);
+        return -1;
+    }
+
+    // Preprocess the input buffer with the data from the vector
+    size_t halfLen = len / 2;
+    for (size_t i = 0; i < halfLen; i++) {
+        fft_data_in[i] = vector[i * 2];
+        fft_data_in[len - 1 - i] = vector[i * 2 + 1];
+    }
+    if (len % 2 == 1) {
+        fft_data_in[halfLen] = vector[len - 1];
+    }
+
+    int r = rfft(fft_data_in, len, fft_data_out, (len / 2 + 1), len);
+    if (r != 0) {
+        free(fft_data_in);
+        free(fft_data_out);
+        return r;
+    }
+
+    size_t i = 0;
+    for (; i < len / 2 + 1; i++) {
+        float temp = i * M_PI / (len * 2);
+        vector[i] = fft_data_out[i].r * cos(temp) + fft_data_out[i].i * sin(temp);
+    }
+    //take advantage of hermetian symmetry to calculate remainder of signal
+    for (; i < len; i++) {
+        float temp = i * M_PI / (len * 2);
+        int conj_idx = len-i;
+        // second half bins not calculated would have just been the conjugate of the first half (note minus of imag)
+        vector[i] = fft_data_out[conj_idx].r * cos(temp) - fft_data_out[conj_idx].i * sin(temp);
+    }
+    free(fft_data_in);
+    free(fft_data_out);
+
+    return 0;
+}
+
+    /**
+     * Return the Discrete Cosine Transform of arbitrary type sequence 2.
+     * @param input Input array (of size N)
+     * @param N number of items in input and output array
+     * @returns EIDSP_OK if OK
+     */
+    static int dct2(float *input, size_t N, DCT_NORMALIZATION_MODE normalization = DCT_NORMALIZATION_NONE) {
+        if (N == 0) {
+            return 0;
+        }
+
+        int ret = transform(input, N);
+        if (ret != 0) {
+            return -1;
+        }
+
+        // for some reason the output is 2x too low...
+        for (size_t ix = 0; ix < N; ix++) {
+            input[ix] *= 2;
+        }
+
+        if (normalization == DCT_NORMALIZATION_ORTHO) {
+            input[0] = input[0] * sqrt(1.0f / static_cast<float>(4 * N));
+            for (size_t ix = 1; ix < N; ix++) {
+                input[ix] = input[ix] * sqrt(1.0f / static_cast<float>(2 * N));
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Discrete Cosine Transform of arbitrary type sequence 2 on a matrix.
+     * @param matrix
+     * @returns EIDSP_OK if OK
+     */
+    static int dct2(matrix_t *matrix, DCT_NORMALIZATION_MODE normalization = DCT_NORMALIZATION_NONE) {
+        for (size_t row = 0; row < matrix->rows; row++) {
+            int r = dct2(matrix->buffer + (row * matrix->cols), matrix->cols, normalization);
+            if (r != 0) {
+                return r;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Compute the one-dimensional discrete Fourier Transform for real input.
+     * This function computes the one-dimensional n-point discrete Fourier Transform (DFT) of
+     * a real-valued array by means of an efficient algorithm called the Fast Fourier Transform (FFT).
+     * @param src Source buffer
+     * @param src_size Size of the source buffer
+     * @param output Output buffer
+     * @param output_size Size of the output buffer, should be n_fft / 2 + 1
+     * @returns 0 if OK
+     */
+    static int rfft(const float *src, size_t src_size, fft_complex_t *output, size_t output_size, size_t n_fft) {
+        size_t n_fft_out_features = (n_fft / 2) + 1;
+        if (output_size != n_fft_out_features) {
+            return -1;
+        }
+
+        // truncate if needed
+        if (src_size > n_fft) {
+            src_size = n_fft;
+        }
+
+        // declare input and output arrays
+        float *fft_input_buffer = NULL;
+        if (src_size == n_fft) {
+            fft_input_buffer = (float*)src;
+        }
+
+        EI_DSP_MATRIX_B(fft_input, 1, n_fft, fft_input_buffer);
+        if (!fft_input.buffer) {
+            return -1;
+        }
+
+        if (!fft_input_buffer) {
+            // copy from src to fft_input
+            memcpy(fft_input.buffer, src, src_size * sizeof(float));
+            // pad to the rigth with zeros
+            memset(fft_input.buffer + src_size, 0, (n_fft - src_size) * sizeof(float));
+        }
+
+        if (n_fft != 32 && n_fft != 64 && n_fft != 128 && n_fft != 256 &&
+            n_fft != 512 && n_fft != 1024 && n_fft != 2048 && n_fft != 4096) {
+            int ret = software_rfft(fft_input.buffer, output, n_fft, n_fft_out_features);
+            if (ret != 0) {
+                return -1;
+            }
+        }
+        else {
+            // hardware acceleration only works for the powers above...
+            arm_rfft_fast_instance_f32 rfft_instance;
+            int status = cmsis_rfft_init_f32(&rfft_instance, n_fft);
+            if (status != 0) {
+                return status;
+            }
+
+            EI_DSP_MATRIX(fft_output, 1, n_fft);
+            if (!fft_output.buffer) {
+                return -1;
+            }
+
+            arm_rfft_fast_f32(&rfft_instance, fft_input.buffer, fft_output.buffer, 0);
+
+            output[0].r = fft_output.buffer[0];
+            output[0].i = 0.0f;
+            output[n_fft_out_features - 1].r = fft_output.buffer[1];
+            output[n_fft_out_features - 1].i = 0.0f;
+
+            size_t fft_output_buffer_ix = 2;
+            for (size_t ix = 1; ix < n_fft_out_features - 1; ix += 1) {
+                output[ix].r = fft_output.buffer[fft_output_buffer_ix];
+                output[ix].i = fft_output.buffer[fft_output_buffer_ix + 1];
+
+                fft_output_buffer_ix += 2;
+            }
+        }
+
+        return 0;
+    }
+
     /**
      * Compute the one-dimensional discrete Fourier Transform for real input.
      * This function computes the one-dimensional n-point discrete Fourier Transform (DFT) of
@@ -2365,9 +2671,70 @@ public:
 
         return 0;
     }
+    
   
 }
+
+    /**
+     * Return evenly spaced numbers over a specified interval.
+     * Returns num evenly spaced samples, calculated over the interval [start, stop].
+     * The endpoint of the interval can optionally be excluded.
+     *
+     * Based on https://github.com/ntessore/algo/blob/master/linspace.c
+     * Licensed in public domain (see LICENSE in repository above)
+     *
+     * @param start The starting value of the sequence.
+     * @param stop The end value of the sequence.
+     * @param number Number of samples to generate.
+     * @param out Out array, with size `number`
+     * @returns 0 if OK
+     */
+    static int linspace(float start, float stop, uint32_t number, float *out)
+    {
+        if (number < 1 || !out) {
+            return -1;
+        }
+
+        if (number == 1) {
+            out[0] = start;
+            return 0;
+        }
+
+        // step size
+        float step = (stop - start) / (number - 1);
+
+        // do steps
+        for (uint32_t ix = 0; ix < number - 1; ix++) {
+            out[ix] = start + ix * step;
+        }
+
+        // last entry always stop
+        out[number - 1] = stop;
+
+        return 0;
+    }
+
     private:
+    static int software_rfft(float *fft_input, fft_complex_t *output, size_t n_fft, size_t n_fft_out_features)
+    {
+        // create fftr context
+        size_t kiss_fftr_mem_length;
+
+        kiss_fftr_cfg cfg = kiss_fftr_alloc(n_fft, 0, NULL, NULL, &kiss_fftr_mem_length);
+        if (!cfg) {
+            return -1;
+        }
+
+        ei_dsp_register_alloc(kiss_fftr_mem_length, cfg);
+
+        // execute the rfft operation
+        kiss_fftr(cfg, fft_input, (kiss_fft_cpx*)output);
+
+        free(cfg);
+
+        return 0;
+    }
+
     static int software_rfft(float *fft_input, float *output, size_t n_fft, size_t n_fft_out_features) {
         kiss_fft_cpx *fft_output = (kiss_fft_cpx*)malloc(n_fft_out_features * sizeof(kiss_fft_cpx));
         if (!fft_output) {
@@ -3244,6 +3611,82 @@ public:
 
         return 0;
     }
+};
+
+class functions {
+    public:
+
+    /**
+     * This function handle the issue with zero values if the are exposed
+     * to become an argument for any log function.
+     * @param input Array
+     * @param input_size Size of array
+     * @returns void
+     */
+    static void zero_handling(float *input, size_t input_size) {
+        for (size_t ix = 0; ix < input_size; ix++) {
+            if (input[ix] == 0) {
+                input[ix] = 1e-10;
+            }
+        }
+    }
+
+    /**
+     * This function handle the issue with zero values if the are exposed
+     * to become an argument for any log function.
+     * @param input Matrix
+     * @returns void
+     */
+    static void zero_handling(matrix_t *input) {
+        zero_handling(input->buffer, input->rows * input->cols);
+    }
+
+        /**
+     * Converting from frequency to Mel scale
+     *
+     * @param f The frequency values(or a single frequency) in Hz.
+     * @returns The mel scale values(or a single mel).
+     */
+    static float frequency_to_mel(float f) {
+        return 1127.0 * numpy::log(1 + f / 700.0f);
+    }
+
+    /**
+     * Converting from Mel scale to frequency.
+     *
+     * @param mel The mel scale values(or a single mel).
+     * @returns The frequency values(or a single frequency) in Hz.
+     */
+    static float mel_to_frequency(float mel) {
+        return 700.0f * (exp(mel / 1127.0f) - 1.0f);
+    }
+
+    /**
+     * Triangle, I'm not really sure what this does
+     * @param x Linspace output, will be overwritten!
+     * @param x_size Size of the linspace output
+     * @param left
+     * @param middle
+     * @param right
+     */
+    static int triangle(float *x, size_t x_size, int left, int middle, int right) {
+        EI_DSP_MATRIX(out, 1, x_size);
+
+        for (size_t ix = 0; ix < x_size; ix++) {
+            if (x[ix] > left && x[ix] <= middle) {
+                out.buffer[ix] = (x[ix] - left) / (middle - left);
+            }
+
+            if (x[ix] < right && middle <= x[ix]) {
+                out.buffer[ix] = (right - x[ix]) / (right - middle);
+            }
+        }
+
+        memcpy(x, out.buffer, x_size * sizeof(float));
+
+        return 0;
+    }
+
 };
 // more speechpy classes go here ...
 
