@@ -22,7 +22,7 @@
 #ifndef _EI_CLASSIFIER_DSP_BLOCKS_H_
 #define _EI_CLASSIFIER_DSP_BLOCKS_H_
 
-#include "model-parameters/model_metadata.h"
+#include <C:\Users\Elias\Documents\PlatformIO\Projects\220430-220148-nano33ble\src\model-parameters\model_metadata.h>
 #include "model-parameters/model_variables.h"
 #include "edge-impulse-sdk/classifier/ei_run_dsp.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"

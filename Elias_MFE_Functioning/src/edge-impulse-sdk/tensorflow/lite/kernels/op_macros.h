@@ -15,26 +15,7 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_KERNELS_OP_MACROS_H_
 #define TENSORFLOW_LITE_KERNELS_OP_MACROS_H_
 
-// If we're on a platform without standard IO functions, fall back to a
-// non-portable function.
-#ifdef TF_LITE_MCU_DEBUG_LOG
 
-#include "edge-impulse-sdk/tensorflow/lite/micro/debug_log.h"
-
-#define DEBUG_LOG(x) \
-  do {               \
-    DebugLog(x);     \
-  } while (0)
-
-inline void InfiniteLoop() {
-  DEBUG_LOG("HALTED\n");
-  while (1) {
-  }
-}
-
-#define TFLITE_ABORT InfiniteLoop();
-
-#else  // TF_LITE_MCU_DEBUG_LOG
 
 #include <cstdio>
 #include <cstdlib>
@@ -55,13 +36,8 @@ inline void InfiniteLoop() {
 
 #define TFLITE_ABORT abort()
 
-#endif  // TF_LITE_MCU_DEBUG_LOG
-
-#if defined(NDEBUG) || defined(ARDUINO)
 #define TFLITE_ASSERT_FALSE (static_cast<void>(0))
-#else
-#define TFLITE_ASSERT_FALSE TFLITE_ABORT
-#endif
+
 
 #define TF_LITE_FATAL(msg)  \
   do {                      \

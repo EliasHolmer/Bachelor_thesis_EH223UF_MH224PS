@@ -23,13 +23,7 @@
 #ifndef _EIDSP_NUMPY_H_
 #define _EIDSP_NUMPY_H_
 
-// it's valid to include the SDK without a model, but there's information that we need
-// in model_metadata.h (like the FFT tables used).
-// if the compiler does not support the __has_include directive we'll assume that the
-// file exists.
-#ifndef __has_include
-#define __has_include 1
-#endif // __has_include
+
 
 #include <stdint.h>
 #include <string.h>
@@ -41,19 +35,15 @@
 #include "memory.hpp"
 #include "dct/fast-dct-fft.h"
 #include "kissfft/kiss_fftr.h"
-#if __has_include("model-parameters/model_metadata.h")
-#include "model-parameters/model_metadata.h"
-#endif
+
 #if EIDSP_USE_CMSIS_DSP
 #include "edge-impulse-sdk/CMSIS/DSP/Include/arm_math.h"
 #include "edge-impulse-sdk/CMSIS/DSP/Include/arm_const_structs.h"
 #endif
 
-#ifdef __MBED__
+
 #include "mbed.h"
-#else
-#include <functional>
-#endif // __MBED__
+
 
 #define EI_MAX_UINT16 65535
 
@@ -188,7 +178,6 @@ public:
             EIDSP_ERR(EIDSP_MATRIX_SIZE_MISMATCH);
         }
 
-#if EIDSP_USE_CMSIS_DSP
         if (matrix1->rows > EI_MAX_UINT16 || matrix1->cols > EI_MAX_UINT16 || matrix2->rows > EI_MAX_UINT16 ||
             matrix2->cols > EI_MAX_UINT16 || out_matrix->rows > EI_MAX_UINT16 || out_matrix->cols > EI_MAX_UINT16) {
             return EIDSP_NARROWING;
@@ -201,17 +190,7 @@ public:
         if (status != ARM_MATH_SUCCESS) {
             EIDSP_ERR(status);
         }
-#else
-        memset(out_matrix->buffer, 0, out_matrix->rows * out_matrix->cols * sizeof(float));
 
-        for (size_t i = 0; i < matrix1->rows; i++) {
-            dot_by_row(i,
-                matrix1->buffer + (i * matrix1->cols),
-                matrix1->cols,
-                matrix2,
-                out_matrix);
-        }
-#endif
 
         return EIDSP_OK;
     }
@@ -263,7 +242,7 @@ public:
             EIDSP_ERR(EIDSP_MATRIX_SIZE_MISMATCH);
         }
 
-#if EIDSP_USE_CMSIS_DSP
+
         if (matrix1_cols > EI_MAX_UINT16 || matrix2->rows > EI_MAX_UINT16 || matrix2->cols > EI_MAX_UINT16 ||
             out_matrix->cols > EI_MAX_UINT16) {
             return EIDSP_NARROWING;
@@ -276,15 +255,7 @@ public:
         if (status != ARM_MATH_SUCCESS) {
             EIDSP_ERR(status);
         }
-#else
-        for (size_t j = 0; j < matrix2->cols; j++) {
-            float tmp = 0.0f;
-            for (size_t k = 0; k < matrix1_cols; k++) {
-                tmp += row[k] * matrix2->buffer[k * matrix2->cols + j];
-            }
-            out_matrix->buffer[i * matrix2->cols + j] += tmp;
-        }
-#endif
+
 
         return EIDSP_OK;
     }
@@ -355,7 +326,7 @@ public:
             EIDSP_ERR(EIDSP_OUT_OF_MEM);
         }
 
-#if EIDSP_USE_CMSIS_DSP
+
         if (rows > EI_MAX_UINT16 || columns > EI_MAX_UINT16) {
             return EIDSP_NARROWING;
         }
@@ -374,13 +345,7 @@ public:
         if (status != ARM_MATH_SUCCESS) {
             return status;
         }
-#else
-        for (int j = 0; j < rows; j++){
-            for (int i = 0; i < columns; i++){
-                temp_matrix.buffer[j * columns + i] = matrix[i * rows + j];
-            }
-        }
-#endif
+
 
         memcpy(matrix, temp_matrix.buffer, rows * columns * sizeof(float));
 
@@ -614,7 +579,7 @@ public:
     static int scale(matrix_t *matrix, float scale) {
         if (scale == 1.0f) return EIDSP_OK;
 
-#if EIDSP_USE_CMSIS_DSP
+
         if (matrix->rows > EI_MAX_UINT16 || matrix->cols > EI_MAX_UINT16) {
             return EIDSP_NARROWING;
         }
@@ -625,11 +590,7 @@ public:
         if (status != ARM_MATH_SUCCESS) {
             return status;
         }
-#else
-        for (size_t ix = 0; ix < matrix->rows * matrix->cols; ix++) {
-            matrix->buffer[ix] *= scale;
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -647,19 +608,13 @@ public:
         EIDSP_i16 scale_i16;
         float_to_int16(&scale, &scale_i16, 1);
 
-#if EIDSP_USE_CMSIS_DSP
         const arm_matrix_instance_q15 mi = {(uint16_t)matrix->rows, (uint16_t)matrix->cols, matrix->buffer };
         arm_matrix_instance_q15 mo = { (uint16_t)matrix->rows, (uint16_t)matrix->cols, matrix->buffer };
         int status = arm_mat_scale_q15(&mi, scale_i16, 0, &mo);
         if (status != ARM_MATH_SUCCESS) {
             return status;
         }
-#else
-        for (size_t ix = 0; ix < matrix->rows * matrix->cols; ix++) {
-            int32_t prod = (int32_t)matrix->buffer[ix] * scale_i16;
-            matrix->buffer[ix] = saturate((EIDSP_i16)(prod >> 15), 16);
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -677,19 +632,14 @@ public:
         EIDSP_i32 scale_i32;
         float_to_int32(&scale, &scale_i32, 1);
 
-#if EIDSP_USE_CMSIS_DSP
+
         const arm_matrix_instance_q31 mi = { (uint16_t)matrix->rows, (uint16_t)matrix->cols, matrix->buffer };
         arm_matrix_instance_q31 mo = { (uint16_t)matrix->rows, (uint16_t)matrix->cols, matrix->buffer };
         int status = arm_mat_scale_q31(&mi, scale_i32, 0, &mo);
         if (status != ARM_MATH_SUCCESS) {
             return status;
         }
-#else
-        for (size_t ix = 0; ix < matrix->rows * matrix->cols; ix++) {
-            int64_t prod = (int64_t)matrix->buffer[ix] * scale_i32;
-            matrix->buffer[ix] = saturate((EIDSP_i32)(prod >> 31), 32);
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -853,18 +803,11 @@ public:
         }
 
         for (size_t row = 0; row < matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float rms_result;
             arm_rms_f32(matrix->buffer + (row * matrix->cols), matrix->cols, &rms_result);
             output_matrix->buffer[row] = rms_result;
-#else
-            float sum = 0.0;
-            for(size_t ix = 0; ix < matrix->cols; ix++) {
-                float v = matrix->buffer[(row * matrix->cols) + ix];
-                sum += v * v;
-            }
-            output_matrix->buffer[row] = sqrt(sum / static_cast<float>(matrix->cols));
-#endif
+
         }
 
         return EIDSP_OK;
@@ -886,18 +829,11 @@ public:
         }
 
         for (size_t row = 0; row < matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             EIDSP_i16 rms_result;
             arm_rms_q15(matrix->buffer + (row * matrix->cols), matrix->cols, &rms_result);
             output_matrix->buffer[row] = rms_result;
-#else
-            int64_t sum = 0;
-            for(size_t ix = 0; ix < matrix->cols; ix++) {
-                int32_t v = matrix->buffer[(row * matrix->cols) + ix];
-                sum += (int64_t)abs(v * v);
-            }
-            sqrt_q15(saturate((sum / matrix->cols)>>15, 16UL), &output_matrix->buffer[row]);
-#endif
+
         }
 
         return EIDSP_OK;
@@ -917,19 +853,11 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float mean;
             arm_mean_f32(input_matrix->buffer + (row * input_matrix->cols), input_matrix->cols, &mean);
             output_matrix->buffer[row] = mean;
-#else
-            float sum = 0.0f;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                sum += input_matrix->buffer[( row * input_matrix->cols ) + col];
-            }
-
-            output_matrix->buffer[row] = sum / input_matrix->cols;
-#endif
         }
 
         return EIDSP_OK;
@@ -949,19 +877,11 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             EIDSP_i16 mean;
             arm_mean_q15(input_matrix->buffer + (row * input_matrix->cols), input_matrix->cols, &mean);
             output_matrix->buffer[row] = mean;
-#else
-            int32_t sum = 0.0f;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                sum += input_matrix->buffer[( row * input_matrix->cols ) + col];
-            }
-
-            output_matrix->buffer[row] = (EIDSP_i16)(sum / input_matrix->cols);
-#endif
         }
 
         return EIDSP_OK;
@@ -1008,39 +928,9 @@ public:
      * @returns 0 if OK
      */
     static int std_axis0(matrix_t *input_matrix, matrix_t *output_matrix) {
-#if EIDSP_USE_CMSIS_DSP
+
         return std_axis0_CMSIS(input_matrix, output_matrix);
-#else
 
-        if (input_matrix->cols != output_matrix->rows) {
-            EIDSP_ERR(EIDSP_MATRIX_SIZE_MISMATCH);
-        }
-
-        if (output_matrix->cols != 1) {
-            EIDSP_ERR(EIDSP_MATRIX_SIZE_MISMATCH);
-        }
-
-        for (size_t col = 0; col < input_matrix->cols; col++) {
-            float sum = 0.0f;
-
-            for (size_t row = 0; row < input_matrix->rows; row++) {
-                sum += input_matrix->buffer[(row * input_matrix->cols) + col];
-            }
-
-            float mean = sum / input_matrix->rows;
-
-            float std = 0.0f;
-            float tmp;
-            for (size_t row = 0; row < input_matrix->rows; row++) {
-                tmp = input_matrix->buffer[(row * input_matrix->cols) + col] - mean;
-                std += tmp * tmp;
-            }
-
-            output_matrix->buffer[col] = sqrt(std / input_matrix->rows);
-        }
-
-        return EIDSP_OK;
-#endif
     }
 
     /**
@@ -1057,23 +947,12 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float min;
             uint32_t ix;
             arm_min_f32(input_matrix->buffer + (row * input_matrix->cols), input_matrix->cols, &min, &ix);
             output_matrix->buffer[row] = min;
-#else
-            float min = FLT_MAX;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                float v = input_matrix->buffer[( row * input_matrix->cols ) + col];
-                if (v < min) {
-                    min = v;
-                }
-            }
-
-            output_matrix->buffer[row] = min;
-#endif
         }
 
         return EIDSP_OK;
@@ -1093,23 +972,12 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float max;
             uint32_t ix;
             arm_max_f32(input_matrix->buffer + (row * input_matrix->cols), input_matrix->cols, &max, &ix);
             output_matrix->buffer[row] = max;
-#else
-            float max = -FLT_MAX;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                float v = input_matrix->buffer[( row * input_matrix->cols ) + col];
-                if (v > max) {
-                    max = v;
-                }
-            }
-
-            output_matrix->buffer[row] = max;
-#endif
         }
 
         return EIDSP_OK;
@@ -1129,31 +997,13 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float std;
             float var;
             cmsis_arm_variance(&input_matrix->buffer[(row * input_matrix->cols)], input_matrix->cols, &var);
             arm_sqrt_f32(var, &std);
             output_matrix->buffer[row] = std;
-#else
-            float sum = 0.0f;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                sum += input_matrix->buffer[(row * input_matrix->cols) + col];
-            }
-
-            float mean = sum / input_matrix->cols;
-
-            float std = 0.0f;
-
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                float diff;
-                diff = input_matrix->buffer[(row * input_matrix->cols) + col] - mean;
-                std += diff * diff;
-            }
-
-            output_matrix->buffer[row] = sqrt(std / input_matrix->cols);
-#endif
         }
 
         return EIDSP_OK;
@@ -1173,7 +1023,7 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float mean;
             float var;
 
@@ -1194,39 +1044,7 @@ public:
             } else {
                 output_matrix->buffer[row] = m_3 / var;
             }
-#else
-            float sum = 0.0f;
-            float mean;
 
-            // Calculate the mean
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                sum += input_matrix->buffer[( row * input_matrix->cols ) + col];
-            }
-            mean = sum / input_matrix->cols;
-
-            // Calculate the m values
-            float m_3 = 0.0f;
-            float m_2 = 0.0f;
-
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                float diff;
-                diff = input_matrix->buffer[( row * input_matrix->cols ) + col] - mean;
-                m_3 += diff * diff * diff;
-                m_2 += diff * diff;
-            }
-            m_3 = m_3 / input_matrix->cols;
-            m_2 = m_2 / input_matrix->cols;
-
-            // Calculate (m_2)^(3/2)
-            m_2 = sqrt(m_2 * m_2 * m_2);
-
-            // Calculate skew = (m_3) / (m_2)^(3/2)
-            if (m_2 == 0.0f) {
-                output_matrix->buffer[row] = 0.0f;
-            } else {
-                output_matrix->buffer[row] = m_3 / m_2;
-            }
-#endif
         }
 
         return EIDSP_OK;
@@ -1246,7 +1064,7 @@ public:
         }
 
         for (size_t row = 0; row < input_matrix->rows; row++) {
-#if EIDSP_USE_CMSIS_DSP
+
             float mean;
             float var;
 
@@ -1265,39 +1083,7 @@ public:
             } else {
                 output_matrix->buffer[row] = (m_4 / var) - 3.0f;
             }
-#else
-            // Calculate the mean
-            float mean = 0.0f;
-            float sum = 0.0f;
 
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                sum += input_matrix->buffer[( row * input_matrix->cols ) + col];
-            }
-            mean = sum / input_matrix->cols;
-
-            // Calculate m_4 & variance
-            float m_4 = 0.0f;
-            float variance = 0.0f;
-
-            for (size_t col = 0; col < input_matrix->cols; col++) {
-                float diff;
-                diff = input_matrix->buffer[(row * input_matrix->cols) + col] - mean;
-                float square_diff = diff * diff;
-                variance += square_diff;
-                m_4 += square_diff * square_diff;
-            }
-            m_4 = m_4 / input_matrix->cols;
-            variance = variance / input_matrix->cols;
-
-            // Square the variance
-            variance = variance * variance;
-            // Calculate Fisher kurtosis = (m_4 / variance^2) - 3
-            if (variance == 0.0f) {
-                output_matrix->buffer[row] = -3.0f;
-            } else {
-                output_matrix->buffer[row] = (m_4 / variance) - 3.0f;
-            }
-#endif
         }
 
         return EIDSP_OK;
@@ -1336,7 +1122,7 @@ public:
         // pad to the rigth with zeros
         memset(fft_input.buffer + src_size, 0, (n_fft - src_size) * sizeof(kiss_fft_scalar));
 
-#if EIDSP_USE_CMSIS_DSP
+
         if (n_fft != 32 && n_fft != 64 && n_fft != 128 && n_fft != 256 &&
             n_fft != 512 && n_fft != 1024 && n_fft != 2048 && n_fft != 4096) {
             int ret = software_rfft(fft_input.buffer, output, n_fft, n_fft_out_features);
@@ -1371,12 +1157,7 @@ public:
                 fft_output_buffer_ix += 2;
             }
         }
-#else
-        int ret = software_rfft(fft_input.buffer, output, n_fft, n_fft_out_features);
-        if (ret != EIDSP_OK) {
-            EIDSP_ERR(ret);
-        }
-#endif
+
 
         return EIDSP_OK;
     }
@@ -1421,7 +1202,7 @@ public:
             memset(fft_input.buffer + src_size, 0, (n_fft - src_size) * sizeof(float));
         }
 
-#if EIDSP_USE_CMSIS_DSP
+
         if (n_fft != 32 && n_fft != 64 && n_fft != 128 && n_fft != 256 &&
             n_fft != 512 && n_fft != 1024 && n_fft != 2048 && n_fft != 4096) {
             int ret = software_rfft(fft_input.buffer, output, n_fft, n_fft_out_features);
@@ -1457,12 +1238,7 @@ public:
                 fft_output_buffer_ix += 2;
             }
         }
-#else
-        int ret = software_rfft(fft_input.buffer, output, n_fft, n_fft_out_features);
-        if (ret != EIDSP_OK) {
-            EIDSP_ERR(ret);
-        }
-#endif
+
 
         return EIDSP_OK;
     }
@@ -1593,13 +1369,9 @@ public:
      * @returns 0 if OK
      */
     static int int32_to_float(const EIDSP_i32 *input, float *output, size_t length) {
-#if EIDSP_USE_CMSIS_DSP
+
         arm_q31_to_float((q31_t *)input, output, length);
-#else
-        for (size_t ix = 0; ix < length; ix++) {
-            output[ix] = (float)(input[ix]) / 2147483648.f;
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -1612,13 +1384,9 @@ public:
      * @returns 0 if OK
      */
     static int float_to_int32(const float *input, EIDSP_i32 *output, size_t length) {
-#if EIDSP_USE_CMSIS_DSP
+
         arm_float_to_q31((float *)input, (q31_t *)output, length);
-#else
-        for (size_t ix = 0; ix < length; ix++) {
-            output[ix] = (EIDSP_i32)saturate((int64_t)(input[ix] * 2147483648.f), 32);
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -1630,13 +1398,9 @@ public:
      * @returns 0 if OK
      */
     static int int16_to_float(const EIDSP_i16 *input, float *output, size_t length) {
-#if EIDSP_USE_CMSIS_DSP
+
         arm_q15_to_float((q15_t *)input, output, length);
-#else
-        for (size_t ix = 0; ix < length; ix++) {
-            output[ix] = (float)(input[ix]) / 32768.f;
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -1649,13 +1413,9 @@ public:
      * @returns 0 if OK
      */
     static int float_to_int16(const float *input, EIDSP_i16 *output, size_t length) {
-#if EIDSP_USE_CMSIS_DSP
+
         arm_float_to_q15((float *)input, output, length);
-#else
-        for (size_t ix = 0; ix < length; ix++) {
-            output[ix] = (EIDSP_i16)saturate((int32_t)(input[ix] * 32768.f), 16);
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -1667,13 +1427,9 @@ public:
      * @returns 0 if OK
      */
     static int int8_to_float(const EIDSP_i8 *input, float *output, size_t length) {
-#if EIDSP_USE_CMSIS_DSP
+
         arm_q7_to_float((q7_t *)input, output, length);
-#else
-        for (size_t ix = 0; ix < length; ix++) {
-            output[ix] = (float)(input[ix]) / 128;
-        }
-#endif
+
         return EIDSP_OK;
     }
 
@@ -1690,13 +1446,9 @@ public:
     static int signal_from_buffer(const float *data, size_t data_size, signal_t *signal)
     {
         signal->total_length = data_size;
-#ifdef __MBED__
+
         signal->get_data = mbed::callback(&numpy::signal_get_data, data);
-#else
-        signal->get_data = [data](size_t offset, size_t length, float *out_ptr) {
-            return numpy::signal_get_data(data, offset, length, out_ptr);
-        };
-#endif
+
         return EIDSP_OK;
     }
 
@@ -2327,130 +2079,9 @@ private:
      */
     static int cmsis_rfft_init_f32(arm_rfft_fast_instance_f32 *rfft_instance, const size_t n_fft)
     {
-// ARM cores (ex M55) with Helium extensions (MVEF) need special treatment (Issue 2843)
-#if EI_CLASSIFIER_HAS_FFT_INFO == 1 && !defined(ARM_MATH_MVEF)
-        arm_status status;
-        switch (n_fft) {
-#if EI_CLASSIFIER_LOAD_FFT_32 == 1
-            case 32: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 16U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len16.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len16.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len16.pTwiddle;
-                rfft_instance->fftLenRFFT = 32U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_32;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_64 == 1
-            case 64: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 32U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len32.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len32.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len32.pTwiddle;
-                rfft_instance->fftLenRFFT = 64U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_64;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_128 == 1
-            case 128: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 64U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len64.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len64.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len64.pTwiddle;
-                rfft_instance->fftLenRFFT = 128U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_128;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_256 == 1
-            case 256: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 128U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len128.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len128.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len128.pTwiddle;
-                rfft_instance->fftLenRFFT = 256U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_256;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_512 == 1
-            case 512: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 256U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len256.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len256.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len256.pTwiddle;
-                rfft_instance->fftLenRFFT = 512U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_512;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_1024 == 1
-            case 1024: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 512U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len512.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len512.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len512.pTwiddle;
-                rfft_instance->fftLenRFFT = 1024U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_1024;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_2048 == 1
-            case 2048: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 1024U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len1024.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len1024.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len1024.pTwiddle;
-                rfft_instance->fftLenRFFT = 2048U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_2048;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-#if EI_CLASSIFIER_LOAD_FFT_4096 == 1
-            case 4096: {
-                arm_cfft_instance_f32 *S = &(rfft_instance->Sint);
-                S->fftLen = 2048U;
-                S->pTwiddle = NULL;
-                S->bitRevLength = arm_cfft_sR_f32_len2048.bitRevLength;
-                S->pBitRevTable = arm_cfft_sR_f32_len2048.pBitRevTable;
-                S->pTwiddle = arm_cfft_sR_f32_len2048.pTwiddle;
-                rfft_instance->fftLenRFFT = 4096U;
-                rfft_instance->pTwiddleRFFT = (float32_t *) twiddleCoef_rfft_4096;
-                status = ARM_MATH_SUCCESS;
-                break;
-            }
-#endif
-            default:
-                return EIDSP_FFT_TABLE_NOT_LOADED;
-        }
 
-        return status;
-#else
         return arm_rfft_fast_init_f32(rfft_instance, n_fft);
-#endif
+
     }
 #endif // #if EIDSP_USE_CMSIS_DSP
 };

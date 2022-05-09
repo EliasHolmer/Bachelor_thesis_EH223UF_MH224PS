@@ -37,9 +37,7 @@
 
 #include "../porting/ei_classifier_porting.h"
 
-#if EIDSP_TRACK_ALLOCATIONS
-#include "memory.hpp"
-#endif
+
 
 #ifdef __cplusplus
 namespace ei {
@@ -69,13 +67,7 @@ typedef struct ei_matrix {
     uint32_t cols;
     bool buffer_managed_by_me;
 
-#if EIDSP_TRACK_ALLOCATIONS
-    const char *_fn;
-    const char *_file;
-    int _line;
-    uint32_t _originally_allocated_rows;
-    uint32_t _originally_allocated_cols;
-#endif
+
 
 #ifdef __cplusplus
     /**
@@ -88,12 +80,7 @@ typedef struct ei_matrix {
         uint32_t n_rows,
         uint32_t n_cols,
         float *a_buffer = NULL
-#if EIDSP_TRACK_ALLOCATIONS
-        ,
-        const char *fn = NULL,
-        const char *file = NULL,
-        int line = 0
-#endif
+
         )
     {
         if (a_buffer) {
@@ -108,19 +95,7 @@ typedef struct ei_matrix {
         cols = n_cols;
 
         if (!a_buffer) {
-#if EIDSP_TRACK_ALLOCATIONS
-            _fn = fn;
-            _file = file;
-            _line = line;
-            _originally_allocated_rows = rows;
-            _originally_allocated_cols = cols;
-            if (_fn) {
-                ei_dsp_register_matrix_alloc_internal(fn, file, line, rows, cols, sizeof(float), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_alloc(rows, cols, sizeof(float), buffer);
-            }
-#endif
+
         }
     }
 
@@ -128,16 +103,7 @@ typedef struct ei_matrix {
         if (buffer && buffer_managed_by_me) {
             ei_free(buffer);
 
-#if EIDSP_TRACK_ALLOCATIONS
-            if (_fn) {
-                ei_dsp_register_matrix_free_internal(_fn, _file, _line, _originally_allocated_rows,
-                    _originally_allocated_cols, sizeof(float), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_free(_originally_allocated_rows, _originally_allocated_cols,
-                    sizeof(float), buffer);
-            }
-#endif
+
         }
     }
 #endif // #ifdef __cplusplus
@@ -149,13 +115,7 @@ typedef struct ei_matrix_i16 {
     uint32_t cols;
     bool buffer_managed_by_me;
 
-#if EIDSP_TRACK_ALLOCATIONS
-    const char *_fn;
-    const char *_file;
-    int _line;
-    uint32_t _originally_allocated_rows;
-    uint32_t _originally_allocated_cols;
-#endif
+
 
 #ifdef __cplusplus
     /**
@@ -168,12 +128,7 @@ typedef struct ei_matrix_i16 {
         uint32_t n_rows,
         uint32_t n_cols,
         EIDSP_i16 *a_buffer = NULL
-#if EIDSP_TRACK_ALLOCATIONS
-        ,
-        const char *fn = NULL,
-        const char *file = NULL,
-        int line = 0
-#endif
+
         )
     {
         if (a_buffer) {
@@ -188,19 +143,7 @@ typedef struct ei_matrix_i16 {
         cols = n_cols;
 
         if (!a_buffer) {
-#if EIDSP_TRACK_ALLOCATIONS
-            _fn = fn;
-            _file = file;
-            _line = line;
-            _originally_allocated_rows = rows;
-            _originally_allocated_cols = cols;
-            if (_fn) {
-                ei_dsp_register_matrix_alloc_internal(fn, file, line, rows, cols, sizeof(EIDSP_i16), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_alloc(rows, cols, sizeof(EIDSP_i16), buffer);
-            }
-#endif
+
         }
     }
 
@@ -208,16 +151,7 @@ typedef struct ei_matrix_i16 {
         if (buffer && buffer_managed_by_me) {
             ei_free(buffer);
 
-#if EIDSP_TRACK_ALLOCATIONS
-            if (_fn) {
-                ei_dsp_register_matrix_free_internal(_fn, _file, _line, _originally_allocated_rows,
-                    _originally_allocated_cols, sizeof(EIDSP_i16), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_free(_originally_allocated_rows, _originally_allocated_cols,
-                    sizeof(EIDSP_i16), buffer);
-            }
-#endif
+
         }
     }
 #endif // #ifdef __cplusplus
@@ -229,13 +163,7 @@ typedef struct ei_matrix_i32 {
     uint32_t cols;
     bool buffer_managed_by_me;
 
-#if EIDSP_TRACK_ALLOCATIONS
-    const char *_fn;
-    const char *_file;
-    int _line;
-    uint32_t _originally_allocated_rows;
-    uint32_t _originally_allocated_cols;
-#endif
+
 
 #ifdef __cplusplus
     /**
@@ -248,12 +176,7 @@ typedef struct ei_matrix_i32 {
         uint32_t n_rows,
         uint32_t n_cols,
         EIDSP_i32 *a_buffer = NULL
-#if EIDSP_TRACK_ALLOCATIONS
-        ,
-        const char *fn = NULL,
-        const char *file = NULL,
-        int line = 0
-#endif
+
         )
     {
         if (a_buffer) {
@@ -268,19 +191,7 @@ typedef struct ei_matrix_i32 {
         cols = n_cols;
 
         if (!a_buffer) {
-#if EIDSP_TRACK_ALLOCATIONS
-            _fn = fn;
-            _file = file;
-            _line = line;
-            _originally_allocated_rows = rows;
-            _originally_allocated_cols = cols;
-            if (_fn) {
-                ei_dsp_register_matrix_alloc_internal(fn, file, line, rows, cols, sizeof(EIDSP_i32), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_alloc(rows, cols, sizeof(EIDSP_i32), buffer);
-            }
-#endif
+
         }
     }
 
@@ -288,16 +199,7 @@ typedef struct ei_matrix_i32 {
         if (buffer && buffer_managed_by_me) {
             ei_free(buffer);
 
-#if EIDSP_TRACK_ALLOCATIONS
-            if (_fn) {
-                ei_dsp_register_matrix_free_internal(_fn, _file, _line, _originally_allocated_rows,
-                    _originally_allocated_cols, sizeof(EIDSP_i32), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_free(_originally_allocated_rows, _originally_allocated_cols,
-                    sizeof(EIDSP_i32), buffer);
-            }
-#endif
+
         }
     }
 #endif // #ifdef __cplusplus
@@ -313,13 +215,7 @@ typedef struct ei_matrix_i8 {
     uint32_t cols;
     bool buffer_managed_by_me;
 
-#if EIDSP_TRACK_ALLOCATIONS
-    const char *_fn;
-    const char *_file;
-    int _line;
-    uint32_t _originally_allocated_rows;
-    uint32_t _originally_allocated_cols;
-#endif
+
 
 #ifdef __cplusplus
     /**
@@ -332,12 +228,7 @@ typedef struct ei_matrix_i8 {
         uint32_t n_rows,
         uint32_t n_cols,
         int8_t *a_buffer = NULL
-#if EIDSP_TRACK_ALLOCATIONS
-        ,
-        const char *fn = NULL,
-        const char *file = NULL,
-        int line = 0
-#endif
+
         )
     {
         if (a_buffer) {
@@ -352,19 +243,7 @@ typedef struct ei_matrix_i8 {
         cols = n_cols;
 
         if (!a_buffer) {
-#if EIDSP_TRACK_ALLOCATIONS
-            _fn = fn;
-            _file = file;
-            _line = line;
-            _originally_allocated_rows = rows;
-            _originally_allocated_cols = cols;
-            if (_fn) {
-                ei_dsp_register_matrix_alloc_internal(fn, file, line, rows, cols, sizeof(int8_t), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_alloc(rows, cols, sizeof(int8_t), buffer);
-            }
-#endif
+
         }
     }
 
@@ -372,16 +251,7 @@ typedef struct ei_matrix_i8 {
         if (buffer && buffer_managed_by_me) {
             ei_free(buffer);
 
-#if EIDSP_TRACK_ALLOCATIONS
-            if (_fn) {
-                ei_dsp_register_matrix_free_internal(_fn, _file, _line, _originally_allocated_rows,
-                    _originally_allocated_cols, sizeof(int8_t), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_free(_originally_allocated_rows, _originally_allocated_cols,
-                    sizeof(int8_t), buffer);
-            }
-#endif
+
         }
     }
 #endif // #ifdef __cplusplus
@@ -397,19 +267,11 @@ typedef struct ei_quantized_matrix {
     uint32_t rows;
     uint32_t cols;
     bool buffer_managed_by_me;
-#ifdef __MBED__
-    mbed::Callback<float(uint8_t)> dequantization_fn;
-#else
-    float (*dequantization_fn)(uint8_t);
-#endif
 
-#if EIDSP_TRACK_ALLOCATIONS
-    const char *_fn;
-    const char *_file;
-    int _line;
-    uint32_t _originally_allocated_rows;
-    uint32_t _originally_allocated_cols;
-#endif
+    mbed::Callback<float(uint8_t)> dequantization_fn;
+
+
+
 
 #ifdef __cplusplus
     /**
@@ -421,18 +283,10 @@ typedef struct ei_quantized_matrix {
      */
     ei_quantized_matrix(uint32_t n_rows,
                         uint32_t n_cols,
-#ifdef __MBED__
                         mbed::Callback<float(uint8_t)> a_dequantization_fn,
-#else
-                        float (*a_dequantization_fn)(uint8_t),
-#endif
+
                         uint8_t *a_buffer = NULL
-#if EIDSP_TRACK_ALLOCATIONS
-                        ,
-                        const char *fn = NULL,
-                        const char *file = NULL,
-                        int line = 0
-#endif
+
                         )
     {
         if (a_buffer) {
@@ -447,19 +301,7 @@ typedef struct ei_quantized_matrix {
         cols = n_cols;
         dequantization_fn = a_dequantization_fn;
         if (!a_buffer) {
-#if EIDSP_TRACK_ALLOCATIONS
-            _fn = fn;
-            _file = file;
-            _line = line;
-            _originally_allocated_rows = rows;
-            _originally_allocated_cols = cols;
-            if (_fn) {
-                ei_dsp_register_matrix_alloc_internal(fn, file, line, rows, cols, sizeof(uint8_t), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_alloc(rows, cols, sizeof(uint8_t), buffer);
-            }
-#endif
+
         }
     }
 
@@ -467,16 +309,7 @@ typedef struct ei_quantized_matrix {
         if (buffer && buffer_managed_by_me) {
             ei_free(buffer);
 
-#if EIDSP_TRACK_ALLOCATIONS
-            if (_fn) {
-                ei_dsp_register_matrix_free_internal(_fn, _file, _line, _originally_allocated_rows,
-                    _originally_allocated_cols, sizeof(uint8_t), buffer);
-            }
-            else {
-                ei_dsp_register_matrix_free(_originally_allocated_rows, _originally_allocated_cols,
-                    sizeof(uint8_t), buffer);
-            }
-#endif
+
         }
     }
 #endif // #ifdef __cplusplus
@@ -506,15 +339,9 @@ typedef struct ei_signal_t {
      * @param length The total length of the signal
      * @param out_ptr An out buffer to set the signal data
      */
-#if EIDSP_SIGNAL_C_FN_POINTER == 1
-    int (*get_data)(size_t, size_t, float *);
-#else
-#ifdef __MBED__
+
     mbed::Callback<int(size_t offset, size_t length, float *out_ptr)> get_data;
-#else
-    std::function<int(size_t offset, size_t length, float *out_ptr)> get_data;
-#endif // __MBED__
-#endif // EIDSP_SIGNAL_C_FN_POINTER == 1
+
 
     size_t total_length;
 } signal_t;
