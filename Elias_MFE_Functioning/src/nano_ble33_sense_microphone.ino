@@ -27,6 +27,15 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(115200);
 
+    Serial.println("Edge Impulse Inferencing Demo");
+
+    // // summary of inferencing settings (from model_metadata.h)
+    // ei_printf("Inferencing settings:\n");
+    // ei_printf("\tInterval: %.2f ms.\n", (float)EI_CLASSIFIER_INTERVAL_MS);
+    // ei_printf("\tFrame size: %d\n", EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE);
+    // ei_printf("\tSample length: %d ms.\n", EI_CLASSIFIER_RAW_SAMPLE_COUNT / 16);
+    // ei_printf("\tNo. of classes: %d\n", sizeof(ei_classifier_inferencing_categories) / sizeof(ei_classifier_inferencing_categories[0]));
+
     microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT);
    
     BLE.begin();
@@ -48,13 +57,14 @@ void setup()
 void loop()
 {
     BLEDevice central = BLE.central();
-    microphone_inference_end();
-    delay(10000);
-    microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT);
+    // microphone_inference_end();
+    // delay(10000);
+    // microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT);
     
     bool m = microphone_inference_record();
     if (!m)
     {
+        // ei_printf("ERR: Failed to record audio...\n");
         return;
     }
 
@@ -67,11 +77,18 @@ void loop()
     EI_IMPULSE_ERROR r = run_classifier(&signal, &result, debug_nn);
     if (r != EI_IMPULSE_OK)
     {
+        // ei_printf("ERR: Failed to run classifier (%d)\n", r);
         return;
     }
 
+    // print the predictions
+    // ei_printf("Predictions ");
+    // ei_printf("(DSP: %d ms., Classification: %d ms., Anomaly: %d ms.)",
+    //     result.timing.dsp, result.timing.classification, result.timing.anomaly);
+    // ei_printf(": \n");
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++)
     {
+                // ei_printf("    %s: %.5f\n", result.classification[ix].label, result.classification[ix].value);
     }
 
     // Writing sensor values to BLE
